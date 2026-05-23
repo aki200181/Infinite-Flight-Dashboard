@@ -1,0 +1,1542 @@
+/* =========================================================================
+   styles.css — Infinite Flight Dashboard
+
+   セクション目次（Ctrl+F で見出しに直接ジャンプ可能）：
+     RESET & BASE                      — :root のカラーパレット、scrollbar 基礎
+     HERO                              — ヘッダ／ロゴ／ボタン共通スタイル
+     MAP                               — インライン 2D Leaflet コンテナ
+     3D GLOBE OVERLAY                  — Globe.gl 拡大ウィンドウ
+     EXPANDED 2D MAP OVERLAY           — 2D 地図拡大ウィンドウ
+     CONTINENTS DOUGHNUT OVERLAY       — 大陸ドーナツ拡大ウィンドウ
+     TOP FLIGHTS EXPANDED OVERLAY      — 飛行時間ランキング拡大ウィンドウ
+     FLIGHT LOG EXPANDED               — フライトログ拡大表示
+     LEAFLET CONTAINER BG              — Leaflet 内部要素の背景オーバーライド
+     MAIN CONTENT                      — カード／グリッド／タイトル
+     BAR ROWS (compact mode)           — 一覧バー（左カラム）
+     HORIZONTAL EXPANDED VIEW          — Aircraft/Airlines 等の縦バー拡大表示
+     CHART WRAPPER                     — Chart.js 描画域
+     FLIGHT TABLE                      — フライトログテーブル
+     DELETE / SELECTION                — 削除確認モーダル、行選択
+     MODAL                             — 共通モーダル骨格
+     TOAST                             — 一時通知（成功・失敗メッセージ）
+     RESPONSIVE                        — メディアクエリ（max-width 1100/860/560）
+     BULK IMPORT MODAL                 — CSV インポート専用 UI
+     AUTOCOMPLETE                      — 入力補完リスト
+     FILE UPLOAD                       — CSV ファイルアップロード
+     NOTIFY BANNER                     — 自動保存イベントのバナー
+     SAVE STATUS INDICATOR             — ヘッダ右の保存ステータスアイコン
+     EMPTY STATE                       — 初回起動・全削除後の状態
+     FILTER BAR                        — フィルターチップ、複数選択ドロップダウン
+     YoY CARDS                         — 比較カード（任意 2 年）
+     TOUCH DEVICES                     — タッチデバイス向け :hover 抑止
+
+   並び順は歴史的経緯で「base → 各オーバーレイ → メイン → 各種コンポーネント → 後付け」
+   になっている。CSS カスケードの順序依存が強く、並び替えは挙動変化のリスクがあるため、
+   1500 行を超えるまでは目次でカバーする方針（PLAN.md H-4 参照）。
+   ========================================================================= */
+
+/* ===================== RESET & BASE ===================== */
+/* :root はダークテーマがデフォルト。ライトテーマは [data-theme="light"] で上書き。
+   ブランドカラー（accent / red / amber / green / violet / orange / cyan / rose）は
+   データ可視化用なので両テーマで「だいたい同じ」を保つが、ライト用には背景白上で
+   コントラストが落ちる cyan / amber などをわずかに濃くしている。
+   JS から色を参照するときは render.js の `cssVar()` ヘルパ経由で読む（テーマ切替時に追従）。 */
+:root {
+  --bg: #060b14;
+  --bg-card: #0d1520;
+  --bg-card-alt: #111c2e;
+  --bg-elevated: #162033;
+  --border: #1a2744;
+  --border-hover: #243a5e;
+  --text: #e8edf5;
+  --text-2: #8c9bb5;
+  --text-3: #4d5f7a;
+  --accent: #3b9eff;
+  --accent-glow: rgba(var(--accent-rgb),0.15);
+  --red: #ff4d6a;
+  --amber: #ffb020;
+  --green: #00d68f;
+  --violet: #9d7aff;
+  --orange: #ff8a3d;
+  --cyan: #00d4ff;
+  --rose: #ff6b9d;
+  /* RGB トリプレット（rgba() でアルファ可変に使う用）。テーマ切替で追従。
+     使用例: background: rgba(var(--accent-rgb),0.12); */
+  --accent-rgb: 59,158,255;
+  --red-rgb:    255,77,106;
+  --green-rgb:  0,214,143;
+  --violet-rgb: 157,122,255;
+  --radius: 14px;
+  --radius-sm: 8px;
+  /* 汎用サーフェストークン（薄い半透明 overlay の階段）。テーマ切替で白基調 ↔ 黒基調が反転する。 */
+  --surface-elev1: rgba(255,255,255,0.025);  /* カード等の控えめな塗り */
+  --surface-elev2: rgba(255,255,255,0.04);   /* ホバー前のカード塗り、薄ボーダー塗り */
+  --surface-elev3: rgba(255,255,255,0.06);   /* ホバー後のやや明るい塗り */
+  --border-soft: rgba(255,255,255,0.03);     /* セクション境界の極薄ボーダー */
+  --border-medium: rgba(255,255,255,0.08);   /* ホバー時のやや明るいボーダー */
+  --backdrop: rgba(6,11,20,0.92);            /* オーバーレイ背景（モーダル後ろの暗幕） */
+  --hero-grad: linear-gradient(160deg,#060b14 0%,#0a1628 40%,#0f1d35 70%,#060b14 100%);
+  /* チャート専用トークン（JS の cssVar 経由で参照される。ダーク基準値）。 */
+  --chart-grid: var(--border-soft);
+  --chart-tick: var(--text-3);
+  --chart-legend: var(--text-2);
+  --chart-legend-strong: #c8d3e3;  /* 拡大版で大きめのフォント色（--text より明るい中間値） */
+  --chart-point-border: var(--bg); /* 背景に対して点が浮く色 */
+  /* 地図（Leaflet）/ Globe 専用トークン */
+  --map-bg: var(--bg);
+  --map-tile-style: dark;          /* 'dark' or 'light'。JS が読んでタイルレイヤを選ぶ */
+  --globe-canvas-bg: #000;         /* 3D Globe の球周りの「宇宙」色（ダーク=真っ黒） */
+  --globe-atmosphere: var(--accent);
+  --globe-poly-cap: rgba(var(--accent-rgb),0.04);
+  --globe-poly-side: rgba(0,0,0,0.05);
+  --globe-poly-stroke: rgba(220,230,245,0.7);
+  --globe-arc: rgba(var(--accent-rgb),0.6);
+  --map-route-line: var(--accent);
+  --map-idl: var(--amber);         /* 国際日付変更線（アンバー点線） */
+  --map-equator: var(--violet);    /* 赤道（紫の点々） */
+}
+
+/* ===================== LIGHT THEME ===================== */
+/* 「白基調・水色アクセント」のソフトな配色。
+   ブランドカラーは少し濃いめにして白背景でも視認性を保つ。 */
+[data-theme="light"] {
+  --bg: #f4f6fa;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f4f6fa;
+  --bg-elevated: #e6ebf3;
+  --border: #dce3ec;
+  --border-hover: #b4bdca;
+  --text: #1a2744;
+  --text-2: #4d5f7a;
+  --text-3: #8c9bb5;
+  --accent: #2680e0;
+  --accent-glow: rgba(var(--accent-rgb),0.10);
+  --red: #dc2848;
+  --amber: #d49000;
+  --green: #00a86b;
+  --violet: #7b4dff;
+  --orange: #e06a1a;
+  --cyan: #0091b3;
+  --rose: #d04880;
+  /* RGB トリプレット（ライト用） */
+  --accent-rgb: 38,128,224;
+  --red-rgb:    220,40,72;
+  --green-rgb:  0,168,107;
+  --violet-rgb: 123,77,255;
+  /* サーフェスは黒基調に反転（白背景にうっすら黒を載せる） */
+  --surface-elev1: rgba(0,0,0,0.02);
+  --surface-elev2: rgba(0,0,0,0.04);
+  --surface-elev3: rgba(0,0,0,0.06);
+  --border-soft: rgba(0,0,0,0.04);
+  --border-medium: rgba(0,0,0,0.10);
+  --backdrop: rgba(244,246,250,0.92);
+  --hero-grad: linear-gradient(160deg,#f4f6fa 0%,#e6ebf3 40%,#dce3ec 70%,#f4f6fa 100%);
+  /* チャート専用トークン（ライト基準値）。grid はやや薄い黒、tick は中明度グレー。 */
+  --chart-grid: rgba(0,0,0,0.05);
+  --chart-tick: var(--text-3);
+  --chart-legend: var(--text-2);
+  --chart-legend-strong: var(--text);
+  --chart-point-border: var(--bg-card);
+  /* 地図 / Globe */
+  --map-bg: #e6ebf3;
+  --map-tile-style: light;
+  --globe-canvas-bg: #0a1628;       /* Light モードでも宇宙感は維持（deep navy） */
+  --globe-atmosphere: var(--accent);
+  --globe-poly-cap: rgba(var(--accent-rgb),0.04);
+  --globe-poly-side: var(--surface-elev3);
+  --globe-poly-stroke: rgba(60,80,120,0.4);
+  --globe-arc: rgba(var(--accent-rgb),0.7);
+  --map-route-line: var(--accent);
+  --map-idl: var(--amber);
+  --map-equator: var(--violet);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--text-3);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:var(--text-2);}
+
+/* ===================== HERO ===================== */
+.hero{
+  position:relative;padding:48px 32px 32px;
+  background:var(--hero-grad);
+  overflow:hidden;
+  /* iOS/iPadOS Safari のフルページスクショは overflow:hidden を擬似要素に効かせきれず、
+     .hero::after の青いグロー（600px 円）が右上にはみ出して写る既知バグの回避。
+     clip-path を併用して boundary を二重にしておくと、スクショ描画でも確実にクリップされる。 */
+  clip-path:inset(0);
+}
+.hero::after{
+  content:'';position:absolute;top:-50%;right:-20%;width:600px;height:600px;
+  background:radial-gradient(circle,rgba(var(--accent-rgb),0.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-inner{max-width:1360px;margin:0 auto;position:relative;z-index:1;}
+.hero-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px;}
+.hero-brand{display:flex;align-items:center;gap:12px;}
+.hero-logo{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),#6c5ce7);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff; /* SVG の stroke="currentColor" がここから色を取る */
+}
+/* SVG ロゴ：ボックスの 64% 幅で配置 → 元の絵文字（font-size:22px）とほぼ同じ視覚サイズ。
+   全環境で同一比率・同一描画。 */
+.hero-logo svg{
+  width:64%;
+  height:auto;
+  display:block;
+}
+.hero-title{font-size:26px;font-weight:700;letter-spacing:-0.5px;}
+.hero-title span{color:var(--accent);}
+.hero-actions{display:flex;gap:10px;align-items:center;}
+.btn-primary{
+  padding:10px 20px;background:var(--accent);border:none;border-radius:var(--radius-sm);
+  color:#fff;font-family:'Outfit';font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:7px;transition:all 0.25s;
+}
+/* ヘッダの 4 ボタン（Add Flight / Import / Export / Clear）は中身の文字数・絵文字幅が
+   バラバラなので、min-width で揃えて中央寄せにしないと縦の整列がガタガタになる。 */
+.hero-actions .btn-primary{min-width:130px;justify-content:center;}
+.btn-primary:hover{background:#2b88e6;transform:translateY(-1px);box-shadow:0 6px 20px rgba(var(--accent-rgb),0.3);}
+.btn-primary[style*="violet"]:hover{background:#7b4dff !important;box-shadow:0 6px 20px rgba(var(--violet-rgb),0.3) !important;}
+.btn-primary[style*="green"]:hover{background:#00b377 !important;box-shadow:0 6px 20px rgba(var(--green-rgb),0.3) !important;}
+.btn-primary[style*="red"]:hover{background:#e6334e !important;box-shadow:0 6px 20px rgba(var(--red-rgb),0.3) !important;}
+.btn-outline{
+  padding:10px 20px;background:transparent;border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text-2);font-family:'Outfit';font-size:13px;
+  font-weight:500;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:7px;
+}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Stats grid */
+.stats-grid{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:12px;
+}
+.stat-box{
+  background:var(--surface-elev1);border:1px solid var(--surface-elev2);
+  border-radius:var(--radius);padding:20px 16px;text-align:center;
+  transition:all 0.3s;position:relative;overflow:hidden;
+}
+.stat-box:hover{background:var(--surface-elev2);border-color:var(--border-medium);}
+/* クリックで対応拡大ウィンドウを開くカード（Flight Time 以外）。
+   通常 hover よりさらに強い縁色とアクセント影で「押せる」ことを示す。 */
+.stat-box.is-clickable{cursor:pointer;}
+.stat-box.is-clickable:hover{
+  background:var(--surface-elev3);border-color:rgba(255,255,255,0.18);
+  transform:translateY(-1px);
+  box-shadow:0 6px 20px rgba(0,0,0,0.25);
+}
+.stat-box.is-clickable:active{transform:translateY(0);box-shadow:none;}
+.stat-box .num{
+  font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;
+  line-height:1;margin-bottom:6px;
+}
+.stat-box .lbl{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;}
+.stat-box:nth-child(1) .num{color:var(--accent);}
+.stat-box:nth-child(2) .num{color:var(--amber);}
+.stat-box:nth-child(3) .num{color:var(--red);}
+.stat-box:nth-child(4) .num{color:var(--green);}
+.stat-box:nth-child(5) .num{color:var(--violet);}
+.stat-box:nth-child(6) .num{color:var(--cyan);}
+
+/* ===================== MAP ===================== */
+.map-section{
+  max-width:1360px;margin:0 auto;padding:20px 32px;
+}
+.map-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;position:relative;
+}
+.map-card .map-header{
+  padding:16px 20px;display:flex;align-items:center;gap:16px;
+  border-bottom:1px solid var(--border);
+}
+.map-header h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+/* 凡例は右寄せ（margin-left:auto）。アクション（.map-actions）はその直後に並ぶ。 */
+.map-legend{display:flex;gap:16px;font-size:11px;color:var(--text-2);margin-left:auto;}
+.map-legend span{display:flex;align-items:center;gap:5px;}
+.map-legend .dot{width:8px;height:8px;border-radius:50%;}
+/* 3D Globe ボタンと拡大ボタンをまとめる。.card-actions と同じ gap:8px。 */
+.map-actions{display:flex;align-items:center;gap:8px;}
+#flightMap{height:420px;background:var(--map-bg);z-index:1;}
+
+/* ===================== 3D GLOBE OVERLAY ===================== */
+.map-globe-btn{
+  padding:5px 12px;background:rgba(var(--accent-rgb),0.12);border:1px solid rgba(var(--accent-rgb),0.3);
+  border-radius:6px;color:var(--accent);font-family:'Outfit';font-size:11px;font-weight:600;
+  cursor:pointer;transition:all 0.2s;
+}
+.map-globe-btn:hover{background:rgba(var(--accent-rgb),0.2);border-color:var(--accent);}
+.globe-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+  align-items:center;justify-content:center;padding:24px;
+}
+.globe-overlay.show{display:flex;}
+.globe-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:1100px;height:85vh;max-height:880px;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.globe-header{
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.globe-header h3{font-size:16px;font-weight:600;}
+#globeContainer{flex:1;min-height:0;position:relative;background:var(--globe-canvas-bg);}
+
+/* ===================== EXPANDED 2D MAP OVERLAY ===================== */
+/* 3D Globe と同じパターン。Leaflet を別インスタンスでもう一つ持たせ、
+   インラインの 2D 地図をそのまま大画面で見るための拡大表示。 */
+.map-expand-btn{
+  padding:5px 12px;background:var(--surface-elev3);border:1px solid var(--border);
+  border-radius:6px;color:var(--text-2);font-family:'Outfit';font-size:11px;font-weight:600;
+  cursor:pointer;transition:all 0.2s;
+}
+.map-expand-btn:hover{background:rgba(255,255,255,0.12);border-color:var(--text-2);color:var(--text-1);}
+.map-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+  align-items:center;justify-content:center;padding:24px;
+}
+.map-overlay.show{display:flex;}
+.map-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:1400px;height:90vh;max-height:920px;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.map-panel-header{
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.map-panel-header h3{font-size:16px;font-weight:600;}
+#flightMapExpanded{flex:1;min-height:0;background:var(--map-bg);z-index:1;}
+
+/* ===================== CONTINENTS DOUGHNUT OVERLAY ===================== */
+/* Continents カードの ⛶ ボタンで開く。インラインのドーナツを大きく見るための拡大表示。 */
+.continents-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+  align-items:center;justify-content:center;padding:24px;
+}
+.continents-overlay.show{display:flex;}
+.continents-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:900px;height:85vh;max-height:820px;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.continents-panel-header{
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.continents-panel-header h3{font-size:16px;font-weight:600;}
+.continents-panel-body{
+  flex:1;min-height:0;padding:32px;position:relative;
+}
+
+/* ===================== CHART EXPANDED OVERLAY (Year/Month/Weekday 共通) ===================== */
+/* Year / Month / Weekday カードの ⛶ ボタンで開く拡大表示。3 チャート共通の骨格を
+   一つのクラスに集約（Continents は doughnut 専用で凡例の余白が違うため別クラス）。 */
+.chart-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+  align-items:center;justify-content:center;padding:24px;
+}
+.chart-overlay.show{display:flex;}
+.chart-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:1100px;height:80vh;max-height:720px;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.chart-panel-header{
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.chart-panel-header h3{font-size:16px;font-weight:600;}
+.chart-panel-body{
+  flex:1;min-height:0;padding:28px 32px 24px;position:relative;
+}
+
+/* ===================== TOP FLIGHTS EXPANDED OVERLAY ===================== */
+/* Top Flights カードの ⛶ ボタンで開く。個別フライトを全件・ソート可能な
+   横方向の list 表示。集計バーではなく flight オブジェクトを 1 行ずつ並べる。 */
+.flights-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+  align-items:center;justify-content:center;padding:24px;
+}
+.flights-overlay.show{display:flex;}
+.flights-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:1100px;height:90vh;max-height:900px;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.flights-panel-header{
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;
+}
+.flights-panel-header h3{font-size:16px;font-weight:600;}
+.flights-panel-header .expanded-sort{margin-left:auto;margin-right:14px;}
+.flights-panel-body{
+  flex:1;min-height:0;overflow-y:auto;padding:8px 20px;
+}
+.flights-panel-footer{
+  padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+}
+/* 他カードの拡大表示（.expanded-footer）と同じ大きな色付きバッジに揃える */
+.flights-panel-footer .total-label{
+  font-size:32px;font-weight:800;line-height:1;color:var(--cyan);
+}
+.flights-panel-footer .total-sub{font-size:13px;color:var(--text-3);}
+/* 各フライト行：rank / date / route / aircraft / airline / 時間バー */
+.flight-row{
+  display:flex;align-items:center;gap:12px;padding:8px 4px;
+  border-bottom:1px solid var(--border-soft);
+}
+.flight-row:last-child{border-bottom:none;}
+.flight-row-rank{
+  width:40px;min-width:40px;font-size:11px;color:var(--text-3);
+  font-family:'JetBrains Mono';font-weight:600;text-align:right;
+}
+.flight-row-date{
+  width:88px;min-width:88px;font-size:11px;color:var(--text-2);
+  font-family:'JetBrains Mono';
+}
+.flight-row-route{
+  width:108px;min-width:108px;font-size:12px;font-weight:600;
+  color:var(--accent);font-family:'JetBrains Mono';
+}
+/* Flight Log の .aircraft-tag と同じ紫系で統一（全 OS 共通） */
+.flight-row-ac{
+  width:54px;min-width:54px;font-size:11px;color:var(--violet);
+  font-family:'JetBrains Mono';font-weight:600;
+  background:rgba(var(--violet-rgb),0.1);border-radius:4px;
+  padding:2px 6px;text-align:center;
+}
+.flight-row-airline{
+  flex:0 0 160px;min-width:160px;font-size:12px;color:var(--text-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.flight-row-track{
+  flex:1;height:22px;background:var(--surface-elev1);
+  border-radius:5px;overflow:hidden;
+}
+.flight-row-fill{
+  height:100%;border-radius:5px;display:flex;align-items:center;
+  padding:0 10px;font-family:'JetBrains Mono';font-size:11px;
+  font-weight:700;color:#fff;min-width:fit-content;
+  transition:width 0.5s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ===================== FLIGHT LOG EXPANDED ===================== */
+/* 他のカード拡大オーバーレイ（flights / continents / map / globe）と同じ
+   中央配置・固定サイズパターン。backdrop の上に乗る形。 */
+.card.card-fullscreen{
+  /* inset:0 + margin:auto で中央寄せ。transform は slideUp アニメーション専用に空けておく
+     （translate(-50%,-50%) で中央寄せすると、slideUp の translateY が transform を上書きして
+       アニメ中だけ中央寄せが外れる現象が起きるため） */
+  position:fixed;inset:0;margin:auto;
+  width:calc(100% - 48px);max-width:1280px;
+  height:90vh;max-height:900px;
+  z-index:200;
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.card.card-fullscreen .table-wrap{
+  flex:1;max-height:none;overflow-y:auto;
+}
+.fullscreen-backdrop{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:199;
+  background:var(--backdrop);backdrop-filter:blur(12px);
+}
+.fullscreen-backdrop.show{display:block;}
+body.has-fullscreen-card{overflow:hidden;}
+
+/* Flight Log サマリーフッター — 通常時は非表示、フルスクリーン時のみ下端に固定 */
+.flight-log-footer{display:none;}
+.card.card-fullscreen .flight-log-footer{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 24px;border-top:1px solid var(--border);
+  font-family:'JetBrains Mono';font-size:12px;color:var(--text-2);
+  flex-shrink:0;background:var(--bg-card);
+}
+
+/* ===================== LEAFLET CONTAINER BG ===================== */
+/* Leaflet の既定背景（薄いグレー）を打ち消し、地図領域外の余白がパネルに溶け込むように。
+   2D 地図インライン／拡大の両方に効く。 */
+.leaflet-container{background:var(--map-bg);}
+
+/* ===================== MAIN CONTENT ===================== */
+.main{max-width:1360px;margin:0 auto;padding:0 32px 60px;}
+
+/* Card */
+.card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;transition:border-color 0.3s;
+}
+.card:hover{border-color:var(--border-hover);}
+.card-header{
+  padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border-soft);
+}
+.card-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+/* カードヘッダ右の小型「拡大」アイコンボタン（toggle が無いカード用） */
+.card-expand-btn{
+  width:30px;height:30px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--text-3);font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;
+  flex-shrink:0;
+}
+.card-expand-btn:hover{border-color:var(--border-hover);color:var(--text);background:var(--surface-elev2);}
+/* カードヘッダ右端のアクション帯（共通）。
+   トグル / ⛶ 拡大ボタン / ✕ などを並べる統一ラッパー。
+   margin-left:auto で右端寄せ、flex-shrink:0 で縮まない。 */
+.card-actions{
+  display:flex;align-items:center;gap:8px;
+  margin-left:auto;flex-shrink:0;
+}
+
+/* Toggle tabs */
+.toggle{display:flex;gap:3px;background:var(--border-soft);padding:3px;border-radius:var(--radius-sm);}
+.toggle-btn{
+  padding:5px 14px;border:none;background:transparent;color:var(--text-3);
+  font-family:'Outfit';font-size:11px;font-weight:600;cursor:pointer;
+  border-radius:6px;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.8px;
+  white-space:nowrap;
+}
+.toggle-btn.active{background:rgba(var(--accent-rgb),0.12);color:var(--accent);}
+.toggle-btn:hover:not(.active){color:var(--text-2);}
+
+/* Grid */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+
+/* ===================== BAR ROWS (compact mode) ===================== */
+.bars-compact{padding:16px 20px;}
+.bar-row{
+  display:flex;align-items:center;gap:10px;padding:7px 0;
+}
+.bar-label{
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+  width:110px;min-width:110px;text-align:right;color:var(--text-2);
+  word-break:break-all;line-height:1.3;
+}
+.bar-track{flex:1;height:30px;background:var(--surface-elev1);border-radius:6px;overflow:hidden;}
+.bar-fill{
+  height:100%;border-radius:6px;display:flex;align-items:center;padding:0 12px;
+  font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:#fff;
+  transition:width 0.7s cubic-bezier(0.22,1,0.36,1);min-width:fit-content;
+}
+.bar-pct{font-size:10px;color:var(--text-3);width:36px;min-width:36px;text-align:right;font-family:'JetBrains Mono';font-weight:500;}
+/* 総飛行時間カラム（機材／航空会社のバー右側）— bar-pct と並ぶ控えめな数値表示 */
+.bar-time{
+  font-family:'JetBrains Mono';font-size:10px;font-weight:500;color:var(--text-3);
+  width:62px;min-width:62px;text-align:right;white-space:nowrap;
+}
+
+/* ===================== HORIZONTAL EXPANDED VIEW ===================== */
+.expanded-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;
+  background:rgba(6,11,20,0.85);backdrop-filter:blur(12px);
+  padding:40px 20px;overflow-y:auto;
+  animation:fadeIn 0.25s ease;
+}
+.expanded-overlay.show{display:flex;flex-direction:column;align-items:center;justify-content:center;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.expanded-panel{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  width:100%;max-width:1200px;max-height:85vh;overflow:hidden;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+.expanded-header{
+  padding:20px 24px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-card);z-index:2;
+}
+.expanded-header h3{font-size:18px;font-weight:700;}
+/* 拡大表示のソートセレクタ — タイトルと閉じるボタンの間に配置 */
+.expanded-sort{display:flex;align-items:center;gap:8px;margin-left:auto;margin-right:14px;}
+.expanded-sort-label{
+  font-size:10px;color:var(--text-3);text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:600;
+}
+.expanded-sort-select{
+  appearance:none;-webkit-appearance:none;
+  background:var(--surface-elev2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 28px 6px 12px;
+  color:var(--text-2);font-family:'Outfit';font-size:12px;font-weight:500;
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%238c9bb5' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+  transition:border-color 0.15s,color 0.15s;
+}
+.expanded-sort-select:hover{border-color:var(--border-hover);color:var(--text);}
+.btn-close{
+  width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+  background:transparent;color:var(--text-2);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;
+}
+.btn-close:hover{background:rgba(var(--red-rgb),0.1);border-color:var(--red);color:var(--red);}
+.expanded-scroll{
+  overflow-x:auto;overflow-y:hidden;padding:24px;white-space:nowrap;
+  display:flex;gap:0;align-items:flex-end;min-height:320px;
+}
+.expanded-bar-item{
+  display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+  min-width:72px;flex-shrink:0;padding:0 6px;
+}
+/* 値ラベル＋バーを固定高さのスタックでまとめ、
+   値ラベルを上端で揃える（バーの高さに応じてラベルが上下しない）。 */
+.expanded-bar-stack{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:space-between; /* val を上端、col を下端に */
+  height:248px; /* val 領域 ~24 + max bar 220 + 余白 */
+  width:100%;
+}
+.expanded-bar-col{
+  width:40px;border-radius:6px 6px 0 0;transition:height 0.6s cubic-bezier(0.22,1,0.36,1);
+  position:relative;cursor:pointer;flex-shrink:0;
+  /* 内部に時間ラベルを表示するためのレイアウト */
+  display:flex;flex-direction:column;align-items:center;overflow:hidden;
+}
+.expanded-bar-col:hover{filter:brightness(1.2);}
+.expanded-bar-val{
+  font-family:'JetBrains Mono';font-size:13px;font-weight:700;color:var(--text);
+  line-height:1.2;min-height:18px;
+}
+/* minsMap が無い card では val が空 → 上端の余白を詰める */
+.expanded-bar-val:empty{min-height:0;}
+/* バー内部の時間表示（例「165h 30m」）— 上端に控えめに */
+.expanded-bar-time-in{
+  font-family:'JetBrains Mono';font-size:9px;font-weight:600;
+  color:rgba(255,255,255,0.92);
+  margin-top:4px;white-space:nowrap;letter-spacing:-0.2px;
+  text-shadow:0 1px 2px rgba(0,0,0,0.25);
+  pointer-events:none;
+}
+/* バー内部の回数表示（Continents / Routes / Airports / Countries / Cities 用）。
+   minsMap が無い card では、上の val 領域は空 → バー内に大きめに回数を表示。 */
+.expanded-bar-count-in{
+  font-family:'JetBrains Mono';font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.95);
+  margin-top:6px;white-space:nowrap;
+  text-shadow:0 1px 2px rgba(0,0,0,0.3);
+  pointer-events:none;
+}
+.expanded-bar-name{
+  font-family:'JetBrains Mono';font-size:11px;font-weight:600;color:var(--text);
+  text-align:center;
+  /* 長いラベル（"All Nippon Airways" など）は最大幅で折り返し、2 行を超えたら "…" 省略。
+     完全な名前は title 属性で hover 表示される。 */
+  max-width:90px;white-space:normal;word-break:break-word;line-height:1.25;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp: 2;-webkit-box-orient:vertical;
+  overflow:hidden;text-overflow:ellipsis;
+  /* 1 行名でも 2 行分の高さを確保 → 各 item の total height が揃い、
+     scroll コンテナ内の flex-end 整列でも上端（stack top）が揃う。 */
+  min-height:2.5em;
+}
+.expanded-bar-pct{
+  font-size:10px;color:var(--text-3);font-family:'JetBrains Mono';font-weight:500;
+}
+.expanded-footer{
+  padding:16px 24px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.expanded-footer .total-label{font-size:32px;font-weight:800;line-height:1;}
+.expanded-footer .total-sub{font-size:13px;color:var(--text-3);}
+
+/* ===================== CHART WRAPPER ===================== */
+.chart-wrap{position:relative;height:280px;padding:20px;}
+
+/* ===================== FLIGHT TABLE ===================== */
+.table-section{margin-top:16px;}
+.table-tools{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.search-input{
+  display:flex;align-items:center;gap:8px;background:var(--border-soft);
+  border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;
+  width:280px;transition:border-color 0.2s;
+}
+.search-input:focus-within{border-color:var(--accent);}
+.search-input input{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  /* font-size:16px は iOS オートズーム防止 */
+  font-family:'Outfit';font-size:16px;
+}
+.search-input input::placeholder{color:var(--text-3);}
+.table-wrap{overflow-x:auto;max-height:480px;overflow-y:auto;}
+.ftable{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:640px;}
+.ftable thead th{
+  position:sticky;top:0;background:var(--bg-card);z-index:2;
+  padding:12px 14px;text-align:left;font-weight:600;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:1px;font-size:10px;
+  border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+  transition:color 0.2s;white-space:nowrap;
+}
+.ftable thead th:hover{color:var(--accent);}
+.ftable tbody tr{transition:background 0.15s;}
+.ftable tbody tr:hover{background:rgba(var(--accent-rgb),0.03);}
+.ftable td{
+  padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.02);
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  /* 縦中央揃え：cb / aircraft-tag / text 等で内容の高さが違っても行内で中央に揃える */
+  vertical-align:middle;
+  /* セル内の改行を抑止して行高を均一化（airline 名が長い行だけ 2 行になるのを防ぐ） */
+  white-space:nowrap;
+}
+/* .cb-wrap は基底で display:flex だが、td に flex を適用するとブラウザによって
+   セル高さの計算がずれて行ごとに高さが変わってしまう。
+   テーブル内では table-cell に戻して text-align:center で水平中央に。 */
+.ftable td.cb-wrap{display:table-cell;text-align:center;}
+.route-tag{color:var(--accent);font-weight:600;white-space:nowrap;}
+.aircraft-tag{
+  display:inline-block;padding:2px 8px;background:rgba(var(--violet-rgb),0.1);
+  border-radius:4px;color:var(--violet);font-size:11px;font-weight:600;white-space:nowrap;
+}
+.airline-tag{color:var(--text-2);font-family:'Outfit';font-weight:400;}
+.time-tag{color:var(--amber);font-weight:600;white-space:nowrap;}
+.date-tag{color:var(--text-3);white-space:nowrap;}
+
+/* ===================== DELETE / SELECTION ===================== */
+.select-bar{
+  display:none;align-items:center;gap:12px;padding:12px 20px;
+  background:rgba(var(--red-rgb),0.06);border-bottom:1px solid rgba(var(--red-rgb),0.15);
+  animation:fadeIn 0.2s ease;
+}
+.select-bar.show{display:flex;}
+.select-bar .sel-count{
+  font-family:'JetBrains Mono';font-size:13px;font-weight:600;color:var(--red);
+  margin-right:auto;
+}
+.btn-danger{
+  padding:8px 18px;background:rgba(var(--red-rgb),0.12);border:1px solid rgba(var(--red-rgb),0.25);
+  border-radius:var(--radius-sm);color:var(--red);font-family:'Outfit';font-size:12px;
+  font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;
+}
+.btn-danger:hover{background:rgba(var(--red-rgb),0.2);border-color:var(--red);}
+.btn-danger-solid{
+  padding:8px 18px;background:var(--red);border:none;
+  border-radius:var(--radius-sm);color:#fff;font-family:'Outfit';font-size:12px;
+  font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;
+}
+.btn-danger-solid:hover{background:#e6003a;transform:translateY(-1px);box-shadow:0 4px 16px rgba(var(--red-rgb),0.3);}
+.btn-cancel{
+  padding:8px 18px;background:transparent;border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text-2);font-family:'Outfit';font-size:12px;
+  font-weight:600;cursor:pointer;transition:all 0.2s;
+}
+.btn-cancel:hover{border-color:var(--text-2);color:var(--text);}
+
+/* Custom checkbox */
+.cb-wrap{display:flex;align-items:center;justify-content:center;}
+.cb{
+  appearance:none;-webkit-appearance:none;width:18px;height:18px;
+  border:1.5px solid var(--text-3);border-radius:4px;cursor:pointer;
+  background:transparent;transition:all 0.15s;position:relative;flex-shrink:0;
+}
+.cb:checked{background:var(--accent);border-color:var(--accent);}
+.cb:checked::after{
+  content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  color:#fff;font-size:11px;font-weight:700;
+}
+.cb:hover:not(:checked){border-color:var(--text-2);}
+.cb.partial{background:var(--accent);border-color:var(--accent);}
+.cb.partial::after{content:'−';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:14px;font-weight:700;line-height:1;}
+
+/* Restore modal — 新セッション時にのみ表示。confirm-overlay と同じ階層だが
+   ボタンの色味（accent 寄り）と icon（無限ロゴ）で差別化。 */
+.restore-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:260;
+  background:rgba(6,11,20,0.94);backdrop-filter:blur(16px);
+  align-items:center;justify-content:center;padding:20px;
+}
+.restore-overlay.show{display:flex;}
+.restore-box{
+  background:var(--bg-card);border:1px solid rgba(var(--accent-rgb),0.25);border-radius:18px;
+  width:100%;max-width:440px;padding:32px;text-align:center;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+/* ヒーロー部の無限ロゴと同じビジュアル言語：青→紫グラデの正方形に白い ∞ */
+.restore-icon{
+  width:56px;height:56px;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent),#6c5ce7);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;margin:0 auto 18px;
+}
+.restore-icon svg{width:64%;height:auto;display:block;}
+.restore-title{font-size:20px;font-weight:700;margin-bottom:10px;}
+.restore-desc{font-size:14px;color:var(--text-2);margin-bottom:8px;line-height:1.6;}
+.restore-desc strong{color:var(--accent);font-weight:700;}
+.restore-note{font-size:11px;color:var(--text-3);margin-bottom:24px;}
+.restore-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.restore-actions button{min-width:140px;justify-content:center;padding:11px 18px;}
+
+/* Save Status Info モーダルの状態別カラー（ok/error/disabled で box の border 色を変える） */
+#saveStatusBox.is-error{border-color:rgba(var(--red-rgb),0.4);}
+#saveStatusBox.is-error .restore-icon{background:linear-gradient(135deg,#ff4d6a,#e6334e);}
+#saveStatusBox.is-error .restore-desc strong{color:var(--red);}
+#saveStatusBox.is-disabled{border-color:rgba(140,155,181,0.3);}
+#saveStatusBox.is-disabled .restore-icon{background:linear-gradient(135deg,#4d5f7a,#2e3a52);color:var(--text-2);}
+
+/* Confirm modal */
+.confirm-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:250;
+  background:rgba(6,11,20,0.9);backdrop-filter:blur(16px);
+  align-items:center;justify-content:center;padding:20px;
+}
+.confirm-overlay.show{display:flex;}
+.confirm-box{
+  background:var(--bg-card);border:1px solid rgba(var(--red-rgb),0.2);border-radius:18px;
+  width:100%;max-width:420px;padding:32px;text-align:center;
+  animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.confirm-icon{font-size:48px;margin-bottom:16px;}
+.confirm-title{font-size:18px;font-weight:700;margin-bottom:8px;}
+.confirm-desc{font-size:13px;color:var(--text-2);margin-bottom:24px;line-height:1.6;}
+.confirm-desc strong{color:var(--red);font-weight:700;}
+.confirm-actions{display:flex;gap:10px;justify-content:center;}
+.confirm-actions button{min-width:120px;justify-content:center;}
+
+/* Row delete hover */
+.row-delete-btn{
+  opacity:0;padding:4px 8px;background:rgba(var(--red-rgb),0.08);border:1px solid transparent;
+  border-radius:4px;color:var(--red);font-size:11px;cursor:pointer;
+  transition:all 0.15s;font-family:'Outfit';font-weight:500;
+}
+.ftable tbody tr:hover .row-delete-btn{opacity:1;}
+.row-delete-btn:hover{background:rgba(var(--red-rgb),0.15);border-color:rgba(var(--red-rgb),0.3);}
+.ftable tbody tr.selected{background:rgba(var(--red-rgb),0.04);}
+.ftable tbody tr.selected td{color:var(--text);}
+
+/* toast variants */
+.toast.toast-red{border-color:var(--red);color:var(--red);}
+
+/* ===================== MODAL ===================== */
+.modal-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;
+  background:rgba(6,11,20,0.88);backdrop-filter:blur(16px);
+  align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:18px;
+  width:100%;max-width:520px;animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);
+  /* Cap height and let the body scroll, so action buttons never fall off-screen
+     when import previews have many rows (esp. on mobile). */
+  max-height:90vh;display:flex;flex-direction:column;
+}
+.modal-head{
+  padding:24px 28px 0;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.modal-head h3{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
+.modal-body{padding:20px 28px 28px;overflow-y:auto;flex:1;min-height:0;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+.form-label{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1.2px;font-weight:600;}
+.form-input{
+  padding:11px 14px;background:var(--border-soft);border:1px solid var(--border);
+  /* font-size:16px は iOS の入力フォーカス時オートズーム（<16px で発動）防止のため。
+     見た目は若干大きくなるが、モバイル操作性が大幅に改善する。 */
+  border-radius:10px;color:var(--text);font-family:'JetBrains Mono';font-size:16px;
+  outline:none;transition:border-color 0.2s;width:100%;
+}
+/* iOS/iPadOS Safari otherwise renders <input type="date"> as a small pill that
+   ignores width:100% — strip the native appearance and force consistent sizing. */
+input[type="date"].form-input{
+  -webkit-appearance:none;appearance:none;
+  display:block;min-height:42px;line-height:1.2;
+}
+.form-input:focus{border-color:var(--accent);}
+.form-input::placeholder{color:var(--text-3);}
+.modal-actions{display:flex;gap:10px;margin-top:8px;}
+.modal-actions .btn-primary{flex:1;justify-content:center;padding:13px;}
+
+/* ===================== TOAST ===================== */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--bg-elevated);border:1px solid var(--green);border-radius:12px;
+  padding:12px 24px;color:var(--green);font-size:13px;font-weight:600;
+  opacity:0;transition:all 0.4s cubic-bezier(0.22,1,0.36,1);z-index:300;
+  display:flex;align-items:center;gap:8px;box-shadow:0 16px 48px rgba(0,0,0,0.5);
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:1100px){
+  .grid-3{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:860px){
+  .stats-grid{grid-template-columns:repeat(3,1fr);}
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  .hero{padding:32px 20px 24px;}
+  .map-section,.main{padding-left:16px;padding-right:16px;}
+  #flightMap{height:300px;}
+  .hero-top{flex-direction:column;align-items:flex-start;}
+  .hero-actions{width:100%;flex-wrap:wrap;}
+  .search-input{width:100%;}
+  .table-tools{flex-direction:column;align-items:stretch;}
+  .bar-label{width:90px;min-width:90px;font-size:11px;}
+  .bar-time{font-size:9px;width:54px;min-width:54px;}
+  .card-header{flex-wrap:wrap;gap:10px;}
+  .card-title{font-size:14px;}
+  .select-bar{flex-wrap:wrap;gap:8px;}
+  .expanded-bar-item{min-width:60px;}
+  .expanded-bar-name{font-size:10px;max-width:74px;}
+  /* 拡大オーバーレイのヘッダ — モバイルでは「タイトルは改行可、ボタンは右端固定」。
+     align-items:flex-start にすることで、タイトルが複数行になっても
+     右側のソート＋✕は上端で揃ったまま左にずれない。
+     対象は .expanded-header（汎用バー拡大）と .flights-panel-header（Top Flights 拡大）。 */
+  .expanded-header,
+  .flights-panel-header{
+    padding:14px 16px;flex-wrap:nowrap;gap:8px;
+    align-items:flex-start;
+  }
+  .expanded-header h3,
+  .flights-panel-header h3{
+    min-width:0;flex:1 1 auto;
+    font-size:15px;line-height:1.3;
+  }
+  .expanded-sort{margin-left:auto;margin-right:0;flex-shrink:0;}
+  .expanded-sort-label{display:none;}
+  .btn-close{flex-shrink:0;}
+  /* インラインのカードヘッダも同じ原則：タイトルは縮ませて改行 OK、アクションは右端固定 */
+  .card-header{
+    flex-wrap:nowrap;align-items:flex-start;gap:10px;
+  }
+  .card-title{min-width:0;flex:1 1 auto;line-height:1.3;}
+  .card-actions,.toggle{flex-shrink:0;}
+  /* Flight Log だけは例外：search input が広いため card-header の wrap を維持し、
+     stacking 時は ⛶ を右上に逃がす */
+  .table-section .card-header{flex-wrap:wrap;}
+  .table-tools{flex-direction:column;align-items:stretch;}
+  .table-tools > .card-expand-btn{align-self:flex-end;order:-1;}
+}
+@media(max-width:560px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .stat-box{padding:14px 10px;}
+  .stat-box .num{font-size:22px;}
+  .stat-box .lbl{font-size:9px;letter-spacing:1px;}
+  .hero-title{font-size:20px;}
+  .form-row{grid-template-columns:1fr;}
+  .expanded-panel{max-height:95vh;}
+  .expanded-scroll{min-height:240px;padding:12px;}
+  .expanded-sort-select{font-size:11px;padding:5px 24px 5px 10px;}
+  .bar-label{width:76px;min-width:76px;font-size:10px;}
+  .bars-compact{padding:12px 14px;}
+  .bar-row{gap:8px;}
+  .bar-fill{font-size:10px;padding:0 8px;}
+  .bar-pct{font-size:9px;width:30px;min-width:30px;}
+  .bar-time{font-size:8px;width:44px;min-width:44px;}
+  /* バー内時間は 32px 幅でも収まるよう 2 行へ折り返す */
+  .expanded-bar-time-in{font-size:8px;white-space:normal;line-height:1.1;text-align:center;}
+  .bar-track{height:26px;}
+  /* K-7 / P-3：地図ヘッダ 2 段組み（モバイル）
+     row1：[h3] [3D Globe ⛶]（タイトルと水平に右上）
+     row2：[Hub Airport Route]（中央揃え）
+     - .map-actions は HTML 3 番目だが flex の wrap で自然に row1 に収まる。
+     - .map-legend は HTML 2 番目だが order:99 で row2 に落とす + width:100% + 中央揃え。 */
+  .map-header{flex-wrap:wrap;gap:10px;row-gap:10px;}
+  .map-legend{
+    font-size:10px;gap:10px;
+    order:99;width:100%;margin-left:0;justify-content:center;
+  }
+  .map-actions{margin-left:auto;}
+  .ftable{min-width:580px;}
+  .ftable td{padding:8px 10px;font-size:11px;}
+  .ftable thead th{padding:10px;font-size:9px;}
+  .expanded-bar-item{min-width:52px;padding:0 3px;}
+  .expanded-bar-col{width:32px;}
+  .expanded-bar-val{font-size:10px;}
+  .expanded-bar-name{font-size:9px;}
+  .expanded-bar-pct{font-size:9px;}
+  .modal{border-radius:14px;}
+  .modal-head{padding:20px 20px 0;}
+  .modal-body{padding:16px 20px 24px;}
+  .modal-head h3{font-size:18px;}
+  .confirm-box{padding:24px;}
+  .confirm-title{font-size:16px;}
+  /* Top Flights 拡大の各行 — モバイルでは固定幅カラム合計が画面を超えて時間バーが右にはみ出してしまうため、
+     2 段組みに切り替える：行1 = rank/date/route/ac、行2 = airline + 時間バー */
+  .flights-panel-body{padding:8px 12px;}
+  .flight-row{flex-wrap:wrap;row-gap:6px;gap:8px;padding:10px 4px;}
+  .flight-row-rank{width:30px;min-width:30px;font-size:10px;}
+  .flight-row-date{width:80px;min-width:80px;font-size:10px;}
+  .flight-row-route{width:96px;min-width:96px;font-size:11px;}
+  .flight-row-ac{width:48px;min-width:48px;font-size:10px;padding:2px 4px;}
+  .flight-row-airline{flex:0 1 100px;min-width:0;font-size:10px;order:98;}
+  .flight-row-track{flex:1 1 auto;min-width:0;order:99;height:20px;}
+  .flight-row-fill{font-size:10px;padding:0 8px;}
+
+  /* ===== K-7 / P-1：ヘッダー（タイトル中央揃え + アクションボタン 2行×3列） ===== */
+  /* 860px の `.hero-top{align-items:flex-start}` を上書きしてタイトル＋ロゴを中央寄せ。
+     hero-brand は flex 子要素のグループなので、align-items:center で水平方向に中央配置される。 */
+  .hero-top{align-items:center;}
+  .hero-brand{justify-content:center;}
+  /* アクションボタンを 3 列グリッド化。HTML 順は Add/Import/Export/Clear/Status/Theme だが、
+     order でモバイル時のみ並び替え：
+       row1 = Add(1) / Import(2) / Status(3)
+       row2 = Export(4) / Clear(5) / Theme(6) */
+  .hero-actions{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;
+  }
+  .hero-actions > *:nth-child(1){order:1;} /* Add Flight */
+  .hero-actions > *:nth-child(2){order:2;} /* Import */
+  .hero-actions > *:nth-child(3){order:4;} /* Export */
+  .hero-actions > *:nth-child(4){order:5;} /* Clear */
+  .hero-actions > *:nth-child(5){order:3;} /* Status (✓) */
+  .hero-actions > *:nth-child(6){order:6;} /* Theme (🌙/☀️) */
+  /* min-width:130px の上書き：3 列に収めるため幅可変に */
+  .hero-actions .btn-primary{
+    min-width:0;width:100%;padding:10px 6px;font-size:12px;
+  }
+  /* save-status / theme-toggle は 38px 固定の正方形 → グリッドセル幅一杯に広げる */
+  .hero-actions .save-status,
+  .hero-actions .theme-toggle{
+    width:100%;height:auto;min-height:42px;
+  }
+
+  /* ===== K-7 / P-2：フィルターチップを 50% 幅で 2 列レイアウトに固定 ===== */
+  /* HTML 順は year/month/weekday/airline/aircraft/country/scope のままで、
+     2 列で自然 wrap させると：
+       row1 = Years / Months
+       row2 = Weekdays / Airlines
+       row3 = Aircraft / Countries
+       row4 = Flights (scope, 単独)
+     チップ幅を可変にしたままだと長文ラベル（"All Countries/Regions" 等）が
+     折り返し位置を狂わせるため、50% 固定でレイアウトを安定化させる。
+     .filter-chips-group は .filter-bar 内で flex:1 だが、モバイルでは
+     flex-basis:100% で必ず独自の行を占有させる（Filters ボタンの隣に並ばないように）。 */
+  .filter-chips-group{
+    gap:8px;flex-basis:100%;width:100%;
+  }
+  /* flex:1 1 + max-width で「最大 50% まで」を強制。min-width:0 と overflow:hidden で
+     長文ラベルも 50% に収まるようにする（はみ出して 1 列化するのを防ぐ）。 */
+  .filter-chips-group > .filter-chip{
+    flex:1 1 calc(50% - 4px);
+    max-width:calc(50% - 4px);
+    min-width:0;
+    box-sizing:border-box;
+    overflow:hidden;
+  }
+  /* chip-btn を chip 全幅に広げて、長文ラベルが折り返しても見切れないようにする */
+  .filter-chip-multi .chip-btn{
+    width:100%;justify-content:flex-start;min-width:0;
+  }
+  /* chip-label は省略表示（長すぎたら …）に。アイコン + ▾ は常に表示。 */
+  .filter-chip-multi .chip-label{
+    flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+
+  /* ===== K-7 / P-4 + P-6：タイトル折り返し時の hanging indent ===== */
+  /* "⏱️ Top Flights by Time" のように長いタイトルが折り返したとき、2 行目を
+     アイコンではなく 1 行目テキスト（"Top" の "T"）の位置に揃える。
+     padding-left + 負の text-indent で 1 行目だけ左に押し出すクラシック手法。
+     アイコン幅は概ね 1em（絵文字 + 半角スペース）なので 1.4em で揃う。 */
+  .card-title,
+  .expanded-header h3,
+  .flights-panel-header h3{
+    display:block;padding-left:1.4em;text-indent:-1.4em;
+  }
+
+  /* ===== K-7 / P-4：Flight Log カードヘッダ（モバイル） =====
+     - ⛶ ボタンをタイトル行の右上端へ（絶対配置で .table-tools から視覚的に抜き出す）
+     - 検索欄 + Clear All を半分幅で 1 行に並べる */
+  .table-section .card-header{
+    position:relative;flex-wrap:wrap;
+    padding-right:60px; /* 絶対配置 ⛶ 用の余白 */
+  }
+  .table-section .table-tools > .card-expand-btn{
+    position:absolute;top:13px;right:16px;
+    align-self:auto;order:0; /* 860px の align-self:flex-end / order:-1 を打ち消し */
+  }
+  /* 860px の column を上書きして 1 行配置に。search 70% / Clear All 30% 程度の比率。
+     search-input は基底で width:280px、860px で width:100% が効いているので、
+     ここで auto + max-width:none で両方とも打ち消して flex に任せる。 */
+  .table-section .table-tools{
+    flex-direction:row;align-items:stretch;gap:8px;width:100%;
+  }
+  .table-section .table-tools .search-input{
+    flex:1 1 0;width:auto;max-width:none;min-width:0;
+  }
+  /* search-input の中の input が text-overflow を持たないため、shrink 時に
+     placeholder/値が幅を押し広げないように min-width:0 を input にも。 */
+  .table-section .table-tools .search-input > input{min-width:0;}
+  .table-section .table-tools > .btn-danger{
+    flex:0 0 auto;padding:8px 12px;white-space:nowrap;
+  }
+}
+
+/* ===================== BULK IMPORT MODAL ===================== */
+.modal-wide{max-width:720px;}
+.bulk-textarea{
+  width:100%;min-height:180px;max-height:360px;resize:vertical;
+  padding:14px;background:var(--border-soft);border:1px solid var(--border);
+  /* font-size:16px は iOS オートズーム防止（<16px で発動） */
+  border-radius:10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:16px;
+  line-height:1.6;outline:none;transition:border-color 0.2s;
+}
+.bulk-textarea:focus{border-color:var(--accent);}
+.bulk-textarea::placeholder{color:var(--text-3);}
+.bulk-hint{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;}
+.bulk-hint code{
+  background:rgba(var(--accent-rgb),0.08);color:var(--accent);padding:1px 5px;border-radius:4px;
+  font-family:'JetBrains Mono';font-size:11px;
+}
+.bulk-preview{
+  margin-top:14px;max-height:200px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:10px;
+}
+.bulk-preview table{width:100%;border-collapse:collapse;font-size:11px;}
+.bulk-preview th{
+  position:sticky;top:0;background:var(--bg-elevated);
+  padding:8px 10px;text-align:left;font-size:10px;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:1px;font-weight:600;
+  border-bottom:1px solid var(--border);
+}
+.bulk-preview td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.02);font-family:'JetBrains Mono';font-size:11px;color:var(--text-2);}
+.bulk-preview tr.row-error td{color:var(--red);background:rgba(var(--red-rgb),0.04);}
+.bulk-count{display:flex;gap:16px;margin-top:10px;font-size:12px;font-weight:600;}
+.bulk-count .valid{color:var(--green);}
+.bulk-count .invalid{color:var(--red);}
+
+/* Export options */
+.export-option{
+  display:flex;align-items:center;gap:12px;
+  padding:14px;margin-bottom:10px;
+  background:var(--border-soft);border:1px solid var(--border);
+  border-radius:10px;cursor:pointer;transition:all 0.2s;
+}
+.export-option:hover{border-color:var(--border-hover);background:rgba(255,255,255,0.05);}
+.export-option:has(input:checked){border-color:rgba(var(--accent-rgb),0.4);background:rgba(var(--accent-rgb),0.05);}
+.export-option:has(input:disabled){opacity:0.4;cursor:not-allowed;}
+.export-option .cb{margin:0;flex-shrink:0;}
+.export-option-text{display:flex;flex-direction:column;gap:2px;}
+.export-option-text strong{font-size:14px;color:var(--text);}
+.export-option-detail{font-size:12px;color:var(--text-3);font-family:'JetBrains Mono';}
+/* チェックボックス行の下に並ぶ「ファイル名プレフィックス」入力行（File: [____] preview.csv） */
+.export-filename-row{
+  display:flex;align-items:center;gap:8px;
+  margin:-4px 4px 10px 38px; /* 左 38px はチェックボックス＋ラベル分のインデント */
+  font-size:11px;color:var(--text-3);
+}
+.export-filename-label{font-family:'JetBrains Mono';letter-spacing:0.5px;}
+.export-filename-input{
+  padding:5px 9px;background:var(--border-soft);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-family:'JetBrains Mono';font-size:11px;
+  outline:none;transition:border-color 0.15s;width:140px;
+}
+.export-filename-input:focus{border-color:var(--accent);background:rgba(var(--accent-rgb),0.05);}
+.export-filename-preview{
+  color:var(--text-3);font-family:'JetBrains Mono';font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;
+}
+
+/* Tab buttons for modal */
+.modal-tabs{display:flex;gap:2px;background:var(--border-soft);padding:3px;border-radius:var(--radius-sm);margin-bottom:16px;}
+.modal-tab{
+  flex:1;padding:8px 12px;border:none;background:transparent;color:var(--text-3);
+  font-family:'Outfit';font-size:12px;font-weight:600;cursor:pointer;
+  border-radius:6px;transition:all 0.2s;text-align:center;
+}
+.modal-tab.active{background:rgba(var(--accent-rgb),0.12);color:var(--accent);}
+.modal-tab:hover:not(.active){color:var(--text-2);}
+
+/* ===================== FLIGHT TIME (SPLIT INPUT) ===================== */
+/* Add Flight モーダルの Flight Time は h と m を分離した 2 入力 + 固定ラベル。
+   各入力はそれぞれ ac-list 付き（履歴頻度 + プリセット）。 */
+.flight-time-input{
+  display:flex;align-items:center;gap:6px;
+}
+.flight-time-input .ac-wrap{flex:1;min-width:0;}
+.flight-time-input .form-input{text-align:center;}
+.flight-time-input .time-unit{
+  color:var(--text-2);font-family:'JetBrains Mono',monospace;
+  font-size:14px;font-weight:600;user-select:none;flex:0 0 auto;
+  padding:0 2px;
+}
+
+/* ===================== AUTOCOMPLETE ===================== */
+.ac-wrap{position:relative;}
+.ac-list{
+  display:none;position:absolute;top:100%;left:0;right:0;z-index:50;
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;
+  max-height:200px;overflow-y:auto;margin-top:4px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.5);
+}
+/* 下に十分なスペースが取れない場合は上方向に開く（モーダル全体のスクロールを避けるため）。
+   _acShow() が動的に付け外しする。 */
+.ac-list.ac-up{
+  top:auto;bottom:100%;
+  margin-top:0;margin-bottom:4px;
+  box-shadow:0 -12px 40px rgba(0,0,0,0.5);
+}
+.ac-list.show{display:block;}
+.ac-item{
+  padding:8px 14px;cursor:pointer;font-size:12px;
+  display:flex;align-items:center;gap:10px;
+  transition:background 0.1s;border-bottom:1px solid rgba(255,255,255,0.02);
+}
+.ac-item:hover,.ac-item.active{background:rgba(var(--accent-rgb),0.08);}
+.ac-item .ac-code{
+  font-family:'JetBrains Mono';font-weight:600;color:var(--accent);
+  min-width:48px;
+}
+.ac-item .ac-detail{color:var(--text-2);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ac-item .ac-badge{
+  font-size:9px;padding:1px 6px;border-radius:3px;font-weight:600;
+  background:rgba(255,255,255,0.05);color:var(--text-3);
+}
+
+/* ===================== FILE UPLOAD ===================== */
+.file-upload-row{
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+}
+/* CSV 選択ボタン — Import 内で最も使うアクションなので、accent カラーの実線塗りで目立たせる */
+.file-upload-btn{
+  padding:10px 18px;background:var(--accent);border:1px solid var(--accent);
+  border-radius:var(--radius-sm);color:#fff;font-family:'Outfit';font-size:13px;
+  font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;
+  box-shadow:0 4px 14px rgba(var(--accent-rgb),0.25);
+}
+.file-upload-btn:hover{
+  background:#5cb0ff;border-color:#5cb0ff;
+  transform:translateY(-1px);box-shadow:0 6px 18px rgba(var(--accent-rgb),0.35);
+}
+.file-upload-name{font-size:12px;color:var(--text-3);font-family:'JetBrains Mono';}
+.file-upload-or{color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+
+/* Leaflet overrides */
+.leaflet-container{background:var(--map-bg) !important;}
+.leaflet-control-zoom a{background:var(--bg-card) !important;color:var(--text) !important;border-color:var(--border) !important;}
+.leaflet-control-attribution{display:none !important;}
+
+/* ===================== NOTIFY BANNER (auto-save events) ===================== */
+/* イベントベースの通知バナー。常設ではなく、保存成功時は 10 秒で自動消滅、
+   保存失敗時は ✕ で閉じるまで常設。 */
+.notify-banner{
+  display:none;align-items:center;justify-content:center;gap:14px;
+  padding:10px 22px;
+  position:sticky;top:0;z-index:170;
+  background:linear-gradient(90deg,rgba(15,29,53,0.96),rgba(15,29,53,0.96)),
+             linear-gradient(90deg,rgba(var(--green-rgb),0.18),rgba(0,212,255,0.18));
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid rgba(var(--green-rgb),0.4);
+  font-size:12px;color:var(--green);font-weight:600;
+  animation:slideDown 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.notify-banner.show{display:flex;}
+.notify-banner.notify-error{
+  background:linear-gradient(90deg,rgba(15,29,53,0.96),rgba(15,29,53,0.96)),
+             linear-gradient(90deg,rgba(var(--red-rgb),0.18),rgba(255,138,61,0.18));
+  border-bottom-color:rgba(var(--red-rgb),0.45);
+  color:var(--red);
+}
+.notify-msg b{font-weight:700;}
+.notify-close{
+  background:transparent;border:1px solid currentColor;border-radius:50%;
+  width:22px;height:22px;color:inherit;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;line-height:1;opacity:0.7;transition:opacity 0.2s;
+  padding:0;
+}
+.notify-close:hover{opacity:1;}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+/* ===================== SAVE STATUS INDICATOR ===================== */
+/* ヘッダ右端の小さな保存ステータスアイコン。常設バナーの代替。
+   通常：緑✓ / エラー：赤! / ストレージ無効：灰○
+   クリックで Export モーダルを開いて CSV バックアップに誘導。 */
+.save-status{
+  width:38px;height:38px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(var(--green-rgb),0.12);border:1px solid rgba(var(--green-rgb),0.35);
+  border-radius:var(--radius-sm);color:var(--green);
+  font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s;
+  font-family:'Outfit';
+}
+.save-status:hover{
+  background:rgba(var(--green-rgb),0.22);border-color:var(--green);
+  box-shadow:0 0 0 3px rgba(var(--green-rgb),0.12);
+}
+.save-status .save-status-icon{line-height:1;}
+/* エラー状態：保存に失敗（QuotaExceeded / file:// で SecurityError 等） */
+.save-status.is-error{
+  background:rgba(var(--red-rgb),0.12);border-color:rgba(var(--red-rgb),0.35);color:var(--red);
+}
+.save-status.is-error:hover{
+  background:rgba(var(--red-rgb),0.22);border-color:var(--red);
+  box-shadow:0 0 0 3px rgba(var(--red-rgb),0.12);
+}
+/* ストレージ無効状態：保存機能そのものが使えない環境（Safari の file:// 等） */
+.save-status.is-disabled{
+  background:rgba(140,155,181,0.08);border-color:rgba(140,155,181,0.25);
+  color:var(--text-3);
+}
+.save-status.is-disabled:hover{
+  background:rgba(140,155,181,0.15);border-color:var(--text-2);
+}
+/* データゼロのときは隠す（Export する対象がないため） */
+body.is-empty #saveStatus{display:none;}
+
+/* ===================== THEME TOGGLE ===================== */
+/* save-status と同じサイズ感の中性ボタン。アイコンは絵文字（☀️/🌙）でテーマ切替を示す。 */
+.theme-toggle{
+  width:38px;height:38px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface-elev2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);
+  font-size:18px;cursor:pointer;transition:all 0.2s;
+  font-family:'Outfit';line-height:1;
+}
+.theme-toggle:hover{
+  background:var(--surface-elev3);border-color:var(--border-hover);
+}
+.theme-toggle .theme-toggle-icon{line-height:1;}
+
+/* ===================== EMPTY STATE ===================== */
+body.is-empty .map-section,
+body.is-empty .main,
+body.is-empty .stats-grid,
+body.is-empty .filter-bar,
+body.is-empty .yoy-section,
+body.is-empty #btnClearAllHeader,
+body.is-empty #btnExport { display:none !important; }
+body:not(.is-empty) #emptyState { display:none; }
+#emptyState{ max-width:760px;margin:60px auto;padding:0 32px; }
+.empty-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:18px;
+  padding:48px 40px;text-align:center;
+}
+.empty-icon{ font-size:56px;margin-bottom:18px;display:inline-block;
+  filter:drop-shadow(0 0 24px rgba(var(--accent-rgb),0.3)); }
+.empty-title{font-size:24px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px;}
+.empty-sub{font-size:14px;color:var(--text-2);margin-bottom:32px;line-height:1.6;}
+.empty-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:28px;}
+.empty-actions button{font-size:14px;padding:14px 26px;}
+.empty-hint{
+  padding:16px 20px;background:rgba(var(--accent-rgb),0.04);
+  border:1px solid rgba(var(--accent-rgb),0.12);border-radius:10px;
+  font-size:12px;color:var(--text-2);line-height:1.7;text-align:left;
+}
+.empty-hint code{
+  background:rgba(var(--accent-rgb),0.12);color:var(--accent);
+  padding:1px 6px;border-radius:4px;font-family:'JetBrains Mono';font-size:11px;
+}
+.empty-hint strong{color:var(--text);}
+@media(max-width:560px){
+  #emptyState{margin:24px auto;padding:0 16px;}
+  .empty-card{padding:32px 20px;}
+  .empty-icon{font-size:44px;}
+  .empty-title{font-size:20px;}
+  .empty-actions{flex-direction:column;}
+  .empty-actions button{width:100%;}
+}
+
+/* ===================== FILTER BAR ===================== */
+/* 折り畳み可能なフィルターバー。`.collapsed` 状態ではトグルボタンだけが見える。
+   比較セクション（.yoy-section）との間に視覚的な分離を出すため、bottom padding を持つ。 */
+.filter-bar{
+  max-width:1360px;margin:0 auto;padding:14px 32px 14px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+}
+/* チップ群をまとめるラッパー。折り畳み時はこれごと非表示にする */
+.filter-chips-group{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;
+}
+.filter-bar.collapsed .filter-chips-group{display:none;}
+/* 「Filters ▾」トグルボタン。視覚的にフィルターチップ群と区別できるよう、
+   操作系ボタン（青/紫/緑/赤）と被らない amber アクセントで目立たせる。 */
+.filter-toggle-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 14px;background:rgba(255,176,32,0.10);
+  border:1px solid rgba(255,176,32,0.5);
+  border-radius:14px;color:var(--amber);font-family:'Outfit';
+  font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
+  cursor:pointer;transition:all 0.2s;
+}
+.filter-toggle-btn:hover{
+  background:rgba(255,176,32,0.20);border-color:var(--amber);
+  box-shadow:0 0 0 3px rgba(255,176,32,0.12);
+}
+.filter-toggle-btn .filter-toggle-arrow{
+  font-size:12px;transition:transform 0.2s;
+}
+.filter-bar.collapsed .filter-toggle-arrow{transform:rotate(-90deg);}
+/* 適用中フィルター件数バッジ。0 件のときは display:none で隠す（main.js 制御） */
+.filter-active-badge{
+  background:var(--accent);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:10px;letter-spacing:0;
+  font-family:'JetBrains Mono';line-height:1.2;
+}
+.filter-bar .filter-label{
+  font-size:10px;color:var(--text-3);text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:600;margin-right:6px;
+}
+.filter-chip{
+  position:relative;display:inline-flex;align-items:center;
+  padding:6px 12px;background:var(--bg-card);border:1px solid var(--border);
+  border-radius:20px;font-family:'Outfit';font-size:12px;
+  color:var(--text-2);cursor:pointer;transition:all 0.2s;gap:6px;
+}
+.filter-chip:hover{border-color:var(--border-hover);color:var(--text);}
+.filter-chip.active{
+  background:rgba(var(--accent-rgb),0.12);border-color:rgba(var(--accent-rgb),0.4);color:var(--accent);
+}
+/* === Multi-select chip (button + dropdown menu) === */
+/* チップ全体は padding:0 にして、内側のボタンが padding を負う。これで
+   ボタンの hit area がチップ全体に拡がる（タップしやすい）。 */
+.filter-chip-multi{padding:0;}
+.filter-chip-multi .chip-btn{
+  appearance:none;background:transparent;border:none;outline:none;
+  color:inherit;font-family:inherit;font-size:inherit;font-weight:500;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;cursor:pointer;border-radius:20px;
+}
+.filter-chip-multi .chip-label{font-weight:500;}
+.filter-chip-multi .chip-arrow{
+  color:var(--text-3);font-size:9px;transition:transform 0.15s;margin-left:2px;
+}
+.filter-chip-multi.open .chip-arrow{transform:rotate(180deg);}
+.filter-chip.active .chip-arrow{color:var(--accent);}
+
+/* Dropdown menu */
+.chip-menu{
+  display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:50;
+  min-width:200px;max-width:280px;max-height:280px;overflow-y:auto;
+  background:var(--bg-card);border:1px solid var(--border-hover);border-radius:10px;
+  box-shadow:0 12px 32px rgba(0,0,0,0.45);
+  padding:4px;
+}
+.chip-menu.open{display:block;}
+.chip-menu-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;border-radius:6px;cursor:pointer;
+  font-size:12px;color:var(--text-2);user-select:none;
+}
+.chip-menu-item:hover{background:var(--surface-elev2);color:var(--text);}
+/* メニュー内のチェックボックスは既存 .cb を流用しつつサイズだけ少し小さく */
+.chip-menu-item .cb{width:14px;height:14px;border-radius:3px;}
+.chip-menu-item .cb:checked::after{font-size:9px;}
+.chip-menu-empty{padding:10px;text-align:center;color:var(--text-3);font-size:11px;}
+
+.filter-clear{
+  font-size:11px;color:var(--text-3);cursor:pointer;padding:4px 10px;
+  border-radius:6px;transition:all 0.2s;
+}
+.filter-clear:hover{color:var(--red);background:rgba(var(--red-rgb),0.08);}
+
+/* ===================== YoY CARDS ===================== */
+.yoy-section{ max-width:1360px;margin:0 auto;padding:0 32px 16px; }
+.yoy-grid{ display:grid;grid-template-columns:repeat(4,1fr);gap:12px; }
+.yoy-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 20px;
+}
+.yoy-card .yoy-label{
+  font-size:10px;color:var(--text-3);text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:600;margin-bottom:8px;
+}
+.yoy-card .yoy-value{
+  font-family:'JetBrains Mono';font-size:24px;font-weight:700;line-height:1;
+}
+.yoy-card .yoy-delta{
+  display:inline-flex;align-items:center;gap:4px;
+  margin-top:8px;font-size:11px;font-weight:600;font-family:'JetBrains Mono';
+  padding:2px 8px;border-radius:10px;
+}
+.yoy-card .yoy-delta.up{color:var(--green);background:rgba(var(--green-rgb),0.1);}
+.yoy-card .yoy-delta.down{color:var(--red);background:rgba(var(--red-rgb),0.1);}
+.yoy-card .yoy-delta.flat{color:var(--text-3);background:var(--surface-elev2);}
+.yoy-card .yoy-prev{font-size:10px;color:var(--text-3);margin-top:6px;}
+/* Compare anchor card：旧 renderYoY のグラデーション風アンカーを踏襲 */
+.yoy-anchor{
+  background:linear-gradient(135deg,rgba(var(--accent-rgb),0.08),rgba(var(--violet-rgb),0.08));
+  border-color:rgba(var(--accent-rgb),0.25);
+}
+.yoy-compare{
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px;
+}
+.yoy-vs{
+  font-size:10px;color:var(--text-3);text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:600;padding:0 2px;
+}
+.yoy-yr-select{
+  appearance:none;-webkit-appearance:none;
+  background:rgba(var(--accent-rgb),0.08);border:1px solid rgba(var(--accent-rgb),0.25);
+  border-radius:6px;padding:6px 26px 6px 10px;
+  color:var(--accent);font-family:'JetBrains Mono';font-size:16px;font-weight:700;
+  cursor:pointer;line-height:1;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%233b9eff' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+  transition:background 0.15s,border-color 0.15s;
+}
+.yoy-yr-select:hover{background:rgba(var(--accent-rgb),0.14);border-color:rgba(var(--accent-rgb),0.45);}
+@media(max-width:860px){
+  .yoy-grid{grid-template-columns:repeat(2,1fr);}
+  /* フィルターバー直下に比較カードが密着していたため bottom padding を確保 */
+  .filter-bar{padding:12px 16px 12px;}
+  .yoy-section{padding:0 16px 12px;}
+}
+@media(max-width:560px){ .yoy-card .yoy-value{font-size:18px;} }
+
+/* ===================== PAGE FOOTER ===================== */
+/* ページ最下部のコピーライト + バージョン表示。
+   バージョンは v{major}.{minor} 形式（1.0 → 1.1 → ... → 1.9 → 2.0）。
+   更新ルールは CLAUDE.md の制約 #9 を参照。 */
+.page-footer{
+  padding:32px 20px 24px;
+  text-align:center;
+  color:var(--text-3);
+  font-size:12px;
+  letter-spacing:0.5px;
+}
+.page-footer .app-version{
+  font-family:'JetBrains Mono',monospace;
+  margin-left:6px;
+  color:var(--text-3);
+}
+
+/* ===================== TOUCH DEVICES: suppress :hover ===================== */
+/* タッチデバイスでは tap で :hover が発火し、次の tap までスタイルが残り続ける。
+   hover: none の環境では各 :hover ルールを「base 状態に戻す」値で上書きして
+   視覚効果を出さないようにする。デスクトップ（hover: hover）には影響しない。 */
+@media (hover: none) {
+  .btn-primary:hover { background:var(--accent); transform:none; box-shadow:none; }
+  .btn-primary[style*="violet"]:hover { background:var(--violet) !important; box-shadow:none !important; }
+  .btn-outline:hover { border-color:var(--border); color:var(--text-2); }
+  .btn-close:hover { background:transparent; border-color:var(--border); color:var(--text-2); }
+  .btn-danger:hover { background:rgba(var(--red-rgb),0.12); border-color:rgba(var(--red-rgb),0.25); }
+  .btn-danger-solid:hover { background:var(--red); transform:none; box-shadow:none; }
+  .btn-cancel:hover { border-color:var(--border); color:var(--text-2); }
+  .toggle-btn:hover:not(.active) { color:var(--text-3); }
+  .modal-tab:hover:not(.active) { color:var(--text-3); }
+  .stat-box:hover { background:var(--surface-elev1); border-color:var(--surface-elev2); }
+  .stat-box.is-clickable:hover { background:var(--surface-elev1); border-color:var(--surface-elev2); transform:none; box-shadow:none; }
+  .card:hover { border-color:var(--border); }
+  .expanded-bar-col:hover { filter:none; }
+  .ftable thead th:hover { color:var(--text-3); }
+  .ftable tbody tr:hover { background:transparent; }
+  .ftable tbody tr.selected:hover { background:rgba(var(--red-rgb),0.04); }
+  .row-delete-btn:hover { background:rgba(var(--red-rgb),0.08); border-color:transparent; }
+  .cb:hover:not(:checked) { border-color:var(--text-3); }
+  .ac-item:hover { background:transparent; }
+  .file-upload-btn:hover { border-color:var(--border); color:var(--text-2); background:var(--surface-elev2); }
+  .save-status:hover { background:rgba(var(--green-rgb),0.12); border-color:rgba(var(--green-rgb),0.35); box-shadow:none; }
+  .save-status.is-error:hover { background:rgba(var(--red-rgb),0.12); border-color:rgba(var(--red-rgb),0.35); box-shadow:none; }
+  .filter-chip:hover { border-color:var(--border); color:var(--text-2); }
+  .filter-clear:hover { color:var(--text-3); background:transparent; }
+  .chip-menu-item:hover { background:transparent; color:var(--text-2); }
+  .theme-toggle:hover { background:var(--surface-elev2); border-color:var(--border); }
+}
+
